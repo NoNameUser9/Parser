@@ -10,45 +10,49 @@ headers = {
    "User-Agent": st_useragent
 }
 
-def make_soup(url: str, num_of_pages: int):
-    soup = BeautifulSoup(requests.get(url=url + str(num_of_pages), headers=headers).text, "html.parser")
+def make_soup(url: str, page_number: int):
+    response = requests.get(url=f"{url}{page_number}", headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
     return soup
+
 
 def parse_page(url: str, PAGEN: str):
     soup = make_soup(url + PAGEN, 0)
 
-    # Ищем блок с классом wrap-paging
+    # Find the number of pages
     pagination = soup.find("div", class_="wrap-paging")
     last_page: int
-    # Если блок пагинации найден, ищем максимальный номер страницы
     if pagination:
-        # Находим все ссылки внутри блока пагинации
         pages = pagination.find_all("a", class_="btn")
-
-        # Извлекаем номера страниц и находим максимальный
         last_page = max(int(page.text) for page in pages if page.text.isdigit())
-
-        print(f"Общее количество страниц: {last_page}")
+        print(f"Number of pages: {last_page}")
     else:
-        print("Блок пагинации не найден")
+        print("Paginaiton not found")
+
+    # Create a list to store the data
+    data = []
+    # Iterate over the pages
 
     open(file_path, 'w').close()  # Открываем в режиме 'w' и сразу закрываем, чтобы очистить содержимое
 
-    for i in range(1, last_page + 1):
-        soup = make_soup(url + PAGEN, i)
-        items = soup.find_all("div", {"class": "product-item"})
-        product_data = []
+    # Iterate over the items and extract the data
+    for page_number in range(1, last_page + 1):
+        soup = make_soup(url + PAGEN, page_number)
+        items = soup.find_all("div", class_="product-item")
         for item in items:
-            title = item.find("a", {"class": "product-item-title"}).text.strip()
-            price = item.find("span", {"class": "product-item-price-current"}).text.strip()
+            title = item.find("a", class_="product-item-title").text.strip()
+            price = item.find("span", class_="product-item-price-current").text.strip()
             link = (url.replace("/catalog/napolnyy-plintus", "")
-                    + item.find("a", {"class": "product-item-title"}).get("href").strip())
-            product_data.append({'Название': title, 'Цена': price, 'Ссылка': link})
+                    + item.find("a", class_="product-item-title").get("href").strip())
+            data.append({"title": title, "price": price, "link": link})
+            # df.to_csv(file_path, mode='a', header=(page_number == 0), index=False)
+        print(f"Complete:{page_number}")
 
-        df = pd.DataFrame(product_data)
-        # Добавлять в файл в режиме 'a' (append) и отключить запись заголовков, начиная со второй итерации
-        df.to_csv(file_path, mode='a', header=(i == 0), index=False)
-        print(f"Complete:{i}")
+    # Save the data to a CSV file
+    df = pd.DataFrame(data)
+    df.to_csv(file_path, mode='a', index=False)
+
+    print(f"Data saved to {file_path}")
 
 
 if __name__ == '__main__':
